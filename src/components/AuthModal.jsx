@@ -57,47 +57,44 @@ export default function AuthModal({ isOpen, onClose, onLogin, isMandatory = fals
     setError('');
 
     try {
-      let googleUser = null;
-
-      // Attempt Firebase Google Popup if configured & available
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        if (result?.user) {
-          const u = result.user;
-          googleUser = {
-            email: u.email || 'google.member@auraestates.com',
-            name: u.displayName || (u.email ? u.email.split('@')[0] : 'Google Member'),
-            uid: u.uid,
-            membershipId: 'AE-' + u.uid.substring(0, 6).toUpperCase(),
-            tier: 'Aura Sovereign Club Member',
-            joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-            image: u.photoURL || null
-          };
-        }
-      } catch (fbErr) {
-        console.warn('Firebase Google popup skipped or unavailable, using seamless guest access:', fbErr.message);
-      }
-
-      // Fallback if popup cancelled / blocked / missing backend config
-      if (!googleUser) {
-        const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-        googleUser = {
-          email: 'vip.member@auraestates.com',
-          name: 'Sovereign VIP Member',
-          uid: 'google_' + randomId.toLowerCase(),
-          membershipId: 'AE-' + randomId,
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result && result.user) {
+        const u = result.user;
+        const mappedUser = {
+          email: u.email || '',
+          name: u.displayName || (u.email ? u.email.split('@')[0] : 'Member'),
+          uid: u.uid,
+          membershipId: 'AE-' + u.uid.substring(0, 6).toUpperCase(),
           tier: 'Aura Sovereign Club Member',
           joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          image: null
+          image: u.photoURL || null
         };
-      }
 
-      setIsLoading(false);
-      onLogin(googleUser);
-      if (onClose) onClose();
+        setIsLoading(false);
+        onLogin(mappedUser);
+        if (onClose) onClose();
+      } else {
+        setIsLoading(false);
+      }
     } catch (err) {
       setIsLoading(false);
-      setError('Unable to complete Google sign-in. Please try again or use email.');
+      console.error('Google Sign-in Error:', err);
+
+      // Handle user cancellation gracefully
+      if (
+        err.code === 'auth/popup-closed-by-user' ||
+        err.code === 'auth/cancelled-popup-request'
+      ) {
+        return;
+      }
+
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized in Firebase. Please verify authorized domains.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Google sign-in popup was blocked by browser. Please allow popups for this site.');
+      } else {
+        setError(err.message || 'Unable to sign in with Google. Please try again.');
+      }
     }
   };
 

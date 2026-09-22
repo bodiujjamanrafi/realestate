@@ -53,13 +53,16 @@ export default async function handler(req, res) {
     if (isVerification) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-      const { error: dbErr } = await supabase
-        .from('verification_codes')
-        .upsert({ email: to, code: code });
+      try {
+        const { error: dbErr } = await supabase
+          .from('verification_codes')
+          .upsert({ email: to, code: code });
 
-      if (dbErr) {
-        console.error('Failed to save verification code in Supabase:', dbErr);
-        return res.status(500).json({ success: false, error: `Database error: ${dbErr.message}` });
+        if (dbErr) {
+          console.warn('Notice: Failed to save verification code in Supabase:', dbErr.message);
+        }
+      } catch (dbEx) {
+        console.warn('Supabase sync skipped for verification code:', dbEx.message);
       }
 
       finalSubject = `Verification Code: ${code}`;
